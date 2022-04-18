@@ -27,7 +27,9 @@
 #include "pag/types.h"
 #include "platform/web/GPUDrawable.h"
 #include "platform/web/NativeImage.h"
+#include "platform/web/WebSoftwareDecoderFactory.h"
 #include "rendering/editing/StillImage.h"
+#include "rendering/video/VideoDecoder.h"
 
 using namespace emscripten;
 using namespace pag;
@@ -131,13 +133,12 @@ EMSCRIPTEN_BINDINGS(pag) {
                   return static_cast<int>(pagImageLayer.contentTimeToLayer(contentTime));
                 }))
       .function("_imageBytes", optional_override([](PAGImageLayer& pagImageLayer) {
-        ByteData* result = pagImageLayer.imageBytes();
-        if (result->length() == 0) {
-          uint8_t empty_arr[] = {};
-          return val(typed_memory_view(0, empty_arr));
-        }
-        return val(typed_memory_view(result->length(), result->data()));
-      }));
+                  ByteData* result = pagImageLayer.imageBytes();
+                  if (result->length() == 0) {
+                    return val::null();
+                  }
+                  return val(typed_memory_view(result->length(), result->data()));
+                }));
 
   class_<PAGTextLayer, base<PAGLayer>>("_PAGTextLayer")
       .smart_ptr<std::shared_ptr<PAGTextLayer>>("_PAGTextLayer")
@@ -453,6 +454,17 @@ EMSCRIPTEN_BINDINGS(pag) {
       .value("Miter", tgfx::LineJoin::Miter)
       .value("Round", tgfx::LineJoin::Round)
       .value("Bevel", tgfx::LineJoin::Bevel);
+
+  enum_<DecoderResult>("DecoderResult")
+      .value("Success", DecoderResult::Success)
+      .value("TryAgainLater", DecoderResult::TryAgainLater)
+      .value("Error", DecoderResult::Error);
+
+  function("_RegisterSoftwareDecoderFactory", optional_override([](val factory) {
+             delete VideoDecoder::GetExternalSoftwareDecoderFactory();
+             PAGVideoDecoder::RegisterSoftwareDecoderFactory(
+                 WebSoftwareDecoderFactory::Make(factory).release());
+           }));
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<std::string>("VectorString");
